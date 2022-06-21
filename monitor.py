@@ -26,9 +26,15 @@ class Node:
     self.proc = psutil.Process(pid)
     self.cpu_publisher = rospy.Publisher(ns_join("~", name[1:], "cpu"), Float32, queue_size=20)
     self.mem_publisher = rospy.Publisher(ns_join("~", name[1:], "mem"), UInt64, queue_size=20)
+    self.count=1     # later for running average
+    self.ave_cpu = 0 # average cpu usage
 
   def publish(self):
-    self.cpu_publisher.publish(Float32(self.proc.cpu_percent()))
+    # self.cpu_publisher.publish(Float32(self.proc.cpu_percent()))
+    # Modify here: output 'running average' !
+    self.count += 1
+    self.ave_cpu = self.ave_cpu + (self.proc.cpu_percent()-self.ave_cpu) / self.count
+    self.cpu_publisher.publish(self.ave_cpu)
     self.mem_publisher.publish(UInt64(self.proc.memory_info().rss))
 
   def alive(self):
