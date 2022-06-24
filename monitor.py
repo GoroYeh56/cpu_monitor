@@ -59,6 +59,7 @@ if __name__ == "__main__":
   master = rospy.get_master()
 
   poll_period = rospy.get_param('~poll_period', 1.0)
+  heavy_workload_threshold =  rospy.get_param('~heavy_workload_threshold', 40.0) # >=40%
 
   this_ip = os.environ.get("ROS_IP")
 
@@ -88,7 +89,7 @@ if __name__ == "__main__":
   cpu_values.text_size = 10
   cpu_values.line_width = 1
   cpu_values.font = "DejaVu Sans Mono"
-  heavy_workload_threshold =  40.0 # >=40%
+
 
   while not rospy.is_shutdown():
     for node in rosnode.get_node_names():
@@ -148,7 +149,7 @@ if __name__ == "__main__":
     # Add total cpu values
     # KEY! Ppsutil.cpu_percent() need "interval" (to last time it is called! So cannot be called sequentially immediatedly)
     total_cpu_float = Float32(psutil.cpu_percent())
-    cpu_values.text = "Total cpu: " + str(total_cpu_float) + " %\n" + cpu_values.text
+    cpu_values.text = "Total cpu: " + str(total_cpu_float) + " % (threshold: "+ str(heavy_workload_threshold) + ")\n" + cpu_values.text
     # Set colors  
     cpu_values.fg_color = ColorRGBA(25 / 255.0, 1.0, 240.0 / 255.0, 1.0)
     cpu_values.bg_color = ColorRGBA(0.0, 0.0, 0.0, 0.2)
