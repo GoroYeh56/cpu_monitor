@@ -88,7 +88,7 @@ if __name__ == "__main__":
   cpu_values.text_size = 10
   cpu_values.line_width = 1
   cpu_values.font = "DejaVu Sans Mono"
-
+  heavy_workload_threshold =  40.0 # >=40%
 
   while not rospy.is_shutdown():
     for node in rosnode.get_node_names():
@@ -130,24 +130,32 @@ if __name__ == "__main__":
       if node.alive():
         node.publish()
         # cpu.text add this node
-        this_node_cpu_text = node.name + ": " + str(node.ave_cpu) +"\n"
+        if node.ave_cpu >= heavy_workload_threshold:
+          # use RED for heavy nodes
+          this_node_cpu_text = "<span style='color: red;'>"+node.name + ": " + str(node.ave_cpu) +"</span>\n"
+        else:
+          # normal color
+          this_node_cpu_text = node.name + ": " + str(node.ave_cpu) +"\n"
+        
+
         cpu_values.text += this_node_cpu_text
         
       else:
         rospy.logwarn("[cpu monitor] lost node %s" % node_name)
         del node_map[node_name]
 
-    cpu_publish.publish(Float32(psutil.cpu_percent()))
-
+   
     # Add total cpu values
-    cpu_values.text = "Total cpu: " + str(Float32(psutil.cpu_percent())) + " %\n" + cpu_values.text
+    # KEY! Ppsutil.cpu_percent() need "interval" (to last time it is called! So cannot be called sequentially immediatedly)
+    total_cpu_float = Float32(psutil.cpu_percent())
+    cpu_values.text = "Total cpu: " + str(total_cpu_float) + " %\n" + cpu_values.text
     # Set colors  
     cpu_values.fg_color = ColorRGBA(25 / 255.0, 1.0, 240.0 / 255.0, 1.0)
     cpu_values.bg_color = ColorRGBA(0.0, 0.0, 0.0, 0.2)
     # Publich cpu_values
     viz_cpu_pub.publish(cpu_values)
-    
-  
+
+    cpu_publish.publish(total_cpu_float)
 
 
     vm = psutil.virtual_memory()
