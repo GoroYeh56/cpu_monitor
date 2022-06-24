@@ -9,6 +9,20 @@ import rospy
 
 import psutil
 
+
+# OverlayText for rviz display
+try:
+  from jsk_rviz_plugins.msg import *
+  print("import * from jsk_rviz_plugins.msg")
+except:
+  import roslib;roslib.load_manifest("jsk_rviz_plugins")
+  from jsk_rviz_plugins.msg import *
+  print("go except jsk_rviz_plugins")
+
+from std_msgs.msg import ColorRGBA
+import math
+
+
 try:
   from xmlrpc.client import ServerProxy
 except ImportError:
@@ -31,7 +45,7 @@ class Node:
 
   def publish(self):
     # self.cpu_publisher.publish(Float32(self.proc.cpu_percent()))
-    # Modify here: output 'running average' !
+    # Modify heriz_cpu_pub.e: output 'running average' overlay_sample!
     self.count += 1
     self.ave_cpu = self.ave_cpu + (self.proc.cpu_percent()-self.ave_cpu) / self.count
     self.cpu_publisher.publish(self.ave_cpu)
@@ -49,9 +63,11 @@ if __name__ == "__main__":
   this_ip = os.environ.get("ROS_IP")
 
   node_map = {}
-  ignored_nodes = set()
+  ignored_nodes = set()  #cpu_values.height = 600
 
   cpu_publish = rospy.Publisher("~total_cpu", Float32, queue_size=20)
+  viz_cpu_pub = rospy.Publisher("/viz/cpu_monitor", OverlayText, queue_size=20)
+  print("viz_cpu_pub setup!")
 
   mem_topics = ["available", "used", "free", "active", "inactive", "buffers", "cached", "shared", "slab"]
 
@@ -62,6 +78,17 @@ if __name__ == "__main__":
   for mem_topic in mem_topics:
     mem_publishers.append(rospy.Publisher("~total_%s_mem" % mem_topic,
                                           UInt64, queue_size=20))
+
+  cpu_values = OverlayText()
+  # Set to right upper
+  cpu_values.width = 1000
+  cpu_values.height = 850
+  cpu_values.left = 800
+  cpu_values.top = 0
+  cpu_values.text_size = 10
+  cpu_values.line_width = 1
+  cpu_values.font = "DejaVu Sans Mono"
+
 
   while not rospy.is_shutdown():
     for node in rosnode.get_node_names():
@@ -97,14 +124,31 @@ if __name__ == "__main__":
           node_map[node] = Node(name=node, pid=pid)
           rospy.loginfo("[cpu monitor] adding new node %s" % node)
 
+    # Clear every time
+    cpu_values.text = ""
     for node_name, node in list(node_map.items()):
       if node.alive():
         node.publish()
+        # cpu.text add this node
+        this_node_cpu_text = node.name + ": " + str(node.ave_cpu) +"\n"
+        cpu_values.text += this_node_cpu_text
+        
       else:
         rospy.logwarn("[cpu monitor] lost node %s" % node_name)
         del node_map[node_name]
 
     cpu_publish.publish(Float32(psutil.cpu_percent()))
+
+    # Add total cpu values
+    cpu_values.text = "Total cpu: " + str(Float32(psutil.cpu_percent())) + " %\n" + cpu_values.text
+    # Set colors  
+    cpu_values.fg_color = ColorRGBA(25 / 255.0, 1.0, 240.0 / 255.0, 1.0)
+    cpu_values.bg_color = ColorRGBA(0.0, 0.0, 0.0, 0.2)
+    # Publich cpu_values
+    viz_cpu_pub.publish(cpu_values)
+    
+  
+
 
     vm = psutil.virtual_memory()
     for mem_topic, mem_publisher in zip(mem_topics, mem_publishers):
